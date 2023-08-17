@@ -46,7 +46,7 @@ def get_version() -> kai.BasicResult:
 def get_model() -> kai.BasicResultInner:
     """ Get current model """
     tgi_info = tgi.Info(**requests.get(TGI_ENDPOINT + "/info").json())
-    return kai.BasicResultInner(result=f"{tgi_info.model_id}")
+    return kai.BasicResultInner(result=f"tgi/{tgi_info.model_id}")
 
 @api.get("/config/soft_prompts_list")
 def get_available_softprompts() -> kai.SoftPromptsList:
