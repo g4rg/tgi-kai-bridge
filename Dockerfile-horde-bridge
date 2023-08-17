@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:labs
+FROM ghcr.io/huggingface/text-generation-inference:1.0.1
+
+ENV HORDE_WORKER_VERSION=v23.1.10
+
+RUN apt-get update && apt-get install -y wget git netcat
+
+ADD https://github.com/Haidra-Org/AI-Horde-Worker.git#${HORDE_WORKER_VERSION} /usr/src/AI-Horde-Worker
+WORKDIR /usr/src/AI-Horde-Worker
+RUN ./update-runtime.sh --scribe || true
+
+WORKDIR /usr/src/
+COPY requirements.txt /usr/src/
+RUN pip install -r /usr/src/requirements.txt
+
+WORKDIR /usr/src/AI-Horde-Worker
+RUN pip install -r requirements-scribe.txt
+
+COPY . /usr/src/tgi-kai-bridge
+RUN git apply /usr/src/tgi-kai-bridge/horde-worker.patch
+# alternative patch method
+# RUN sed -e '/self.max_threads = 1/d' -i '/usr/src/AI-Horde-Worker/worker/bridge_data/scribe.py'
+
+WORKDIR /usr/src/
+ENTRYPOINT [ "/usr/src/tgi-kai-bridge/entrypoint-horde-bridge.sh" ]

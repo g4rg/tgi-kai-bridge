@@ -1,0 +1,25 @@
+diff --git a/worker/bridge_data/scribe.py b/worker/bridge_data/scribe.py
+index 8a413f0..2c442eb 100644
+--- a/worker/bridge_data/scribe.py
++++ b/worker/bridge_data/scribe.py
+@@ -32,8 +32,6 @@ class KoboldAIBridgeData(BridgeDataTemplate):
+         super().reload_data()
+         if hasattr(self, "scribe_name") and not self.args.worker_name:
+             self.worker_name = self.scribe_name
+-        # KAI doesn't support multiple threads
+-        self.max_threads = 1
+         if args.kai_url:
+             self.kai_url = args.kai_url
+         if args.sfw:
+diff --git a/worker/jobs/poppers.py b/worker/jobs/poppers.py
+index daac620..ff1e012 100644
+--- a/worker/jobs/poppers.py
++++ b/worker/jobs/poppers.py
+@@ -218,6 +218,7 @@ class ScribePopper(JobPopper):
+             "priority_usernames": self.bridge_data.priority_usernames,
+             "softprompts": self.bridge_data.softprompts[self.bridge_data.model],
+             "bridge_agent": self.BRIDGE_AGENT,
++            "threads": self.bridge_data.max_threads,
+         }
+ 
+     def horde_pop(self):
