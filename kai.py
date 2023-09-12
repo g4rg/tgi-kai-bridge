@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field, PositiveFloat, confloat, conint, constr
+from pydantic import BaseModel, Field, NonNegativeFloat, confloat, conint, constr
 
 
 class AddSentenceSpacingSettings(BaseModel):
@@ -132,7 +132,7 @@ class GenerationInput(BaseModel):
         description='An array of string sequences where the API will stop generating further tokens. The returned text WILL contain the stop sequence.',
         max_items=10,
     )
-    temperature: Optional[PositiveFloat] = Field(None, description='Temperature value.', examples=[0.6])
+    temperature: Optional[NonNegativeFloat] = Field(None, description='Temperature value.', examples=[0.6])
     tfs: Optional[confloat(ge=0.0, le=1.0)] = Field(
         None, description='Tail free sampling value.'
     )
@@ -163,6 +163,10 @@ class GenerationInput(BaseModel):
     use_world_info: Optional[bool] = Field(
         False,
         description='Whether or not to use the world info from the KoboldAI GUI when generating text.',
+    )
+    use_default_badwordsids: Optional[bool] = Field(
+        None,
+        description="Ban tokens that commonly worsen the writing experience for continuous story writing"
     )
 
 
@@ -319,7 +323,7 @@ class TailFreeSamplingSetting(BaseModel):
 
 
 class TemperatureSamplingSetting(BaseModel):
-    value: PositiveFloat
+    value: NonNegativeFloat
 
 
 class TopASamplingSetting(BaseModel):
