@@ -50,9 +50,9 @@ def generate(kai_payload: kai.GenerationInput) -> kai.GenerationOutput:
     return kai.GenerationOutput(results=[kai.GenerationResult(text=result)])
 
 @api.get("/info/version")
-def get_version() -> kai.BasicResult:
-    """ Get API version """
-    return kai.BasicResult(result=kai.BasicResultInner(result="1.2.3"))
+def get_version() -> kai.BasicResultInner:
+    """ Impersonate KAI """
+    return kai.BasicResultInner(result="1.2.4")
 
 @api.get("/model")
 def get_model() -> kai.BasicResultInner:
