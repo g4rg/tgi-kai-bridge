@@ -15,6 +15,7 @@ api = APIRouter()
 
 TGI_ENDPOINT = os.environ.get("TGI_ENDPOINT", "http://127.0.0.1:3000")
 TGI_MODE = os.environ.get("TGI_MODE", "")
+TGI_MODEL = os.environ.get("TGI_MODEL", "")
 
 def translate_payload(kai_payload: kai.GenerationInput) -> tgi.GenerateRequest:
     """ Translate KoboldAI GenerationInput to TGI GenerateRequest """
@@ -57,10 +58,10 @@ def get_version() -> kai.BasicResultInner:
 @api.get("/model")
 def get_model() -> kai.BasicResultInner:
     """ Get current model """
-    tgi_info = tgi.Info(**requests.get(TGI_ENDPOINT + "/info").json())
+    model = TGI_MODEL or tgi.Info(**requests.get(TGI_ENDPOINT + "/info").json()).model_id
     model_name = "tgi" \
         + (f"-{TGI_MODE}" if TGI_MODE else "") \
-        + "/" + tgi_info.model_id
+        + "/" + model
     return kai.BasicResultInner(result=model_name)
 
 @api.get("/config/soft_prompts_list")

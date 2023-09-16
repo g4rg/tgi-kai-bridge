@@ -12,7 +12,8 @@ Environment Variables:
 `KAI_PORT` - port to listen on for KAI clients (default `5000`)  
 `KAI_HOST` - hostname to listen on (default `127.0.0.1`)  
 `TGI_ENDPOINT` - URL to TGI REST API (default `http://127.0.0.1:3000`)  
-`TGI_MODE` - additional information to add to the model name (default `""`)
+`TGI_MODE` - additional information to add to the model name  
+`TGI_MODEL` - model name override
 
 ## Known Issues
 
