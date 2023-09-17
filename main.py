@@ -1,9 +1,12 @@
 #!/bin/env python3
 
 import os
+import json
+
+from typing import Iterator
 
 from fastapi import FastAPI, APIRouter
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.encoders import jsonable_encoder
 
 import requests
@@ -11,6 +14,7 @@ import requests
 import kai
 import tgi
 
+app = FastAPI(title="tgi-kai-bridge")
 api = APIRouter()
 
 TGI_ENDPOINT = os.environ.get("TGI_ENDPOINT", "http://127.0.0.1:3000")
@@ -83,7 +87,60 @@ class BridgeException(Exception):
     def __init__(self, model: kai.BasicError):
         self.model = model
 
-app = FastAPI(title="tgi-kai-bridge")
+def stream_from_tgi(iter_sse_lines: Iterator[bytes]) -> Iterator[str]:
+    """ Produce tokens streamed from TGI SSE byte stream """
+
+    generated_text = ""
+    for line in iter_sse_lines:
+        data = str(line, "utf-8")
+
+        if not data.startswith("data:"):
+            continue
+
+        json_data = json.loads(data.lstrip("data:"))
+        if json_data["generated_text"] is not None and len(json_data["generated_text"]) > 0:
+            generated_text = json_data["generated_text"]
+
+        if json_data["token"]["special"]:
+            continue
+
+        yield json_data["token"]["text"]
+
+    return generated_text
+
+def stream_kobold(iter_tokens: Iterator[str]) -> Iterator[bytes]:
+    """ Produce Kobold SSE byte stream from strings """
+
+    generated_text = ""
+    for token in iter_tokens:
+        yield b"event: message\n"
+        yield f"data: {json.dumps({'token': token})}\n\n".encode()
+        generated_text += token
+
+    return generated_text
+
+@app.post("/api/extra/generate/stream")
+def generate_stream(kai_payload: kai.GenerationInput) -> StreamingResponse:
+    """ KoboldCpp streaming """
+
+    r = requests.post(TGI_ENDPOINT + "/generate_stream", \
+                      json=translate_payload(kai_payload).model_dump(exclude_none=True), \
+                      headers={"Content-Type": "application/json"}, \
+                      stream=True)
+
+    if r.status_code != 200:
+        raise BridgeException(kai.BasicError(msg=r.text, type="Error"))
+
+    return StreamingResponse(stream_kobold(stream_from_tgi(r.iter_lines())), \
+                             headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}, \
+                             media_type='text/event-stream')
+
+@app.post("/api/extra/abort")
+def abort_generation():
+    """ stub for compatibility """
+    return kai.Empty()
+
+
 app.include_router(api, prefix="/api/v1")
 app.include_router(api, prefix="/api/latest", include_in_schema=False)
 
@@ -93,7 +150,8 @@ def exception_handler(_, exc: BridgeException):
 
 @app.get("/api/extra/version")
 def get_extra_version():
-    return {"result": "tgi-kai-bridge", "version": "0.0.1"}
+    """ Impersonate KoboldCpp with streaming support """
+    return {"result": "KoboldCpp", "version": "1.30"}
 
 if __name__ == "__main__":
     import uvicorn
