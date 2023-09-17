@@ -46,12 +46,16 @@ def generate(kai_payload: kai.GenerationInput) -> kai.GenerationOutput:
     """ Generate text """
 
     tgi_payload = translate_payload(kai_payload)
-    r = requests.post(TGI_ENDPOINT + "/generate", json=tgi_payload.model_dump(exclude_none=True), headers={"Content-Type": "application/json"})
+
+    # use streaming to avoid spacing issues
+    # https://github.com/huggingface/text-generation-inference/pull/1024
+    r = requests.post(TGI_ENDPOINT + "/generate_stream", json=tgi_payload.model_dump(exclude_none=True), headers={"Content-Type": "application/json"})
 
     if r.status_code != 200:
         raise BridgeException(kai.BasicError(msg=r.text, type="Error"))
 
-    result = tgi.GenerateResponse(**r.json()).generated_text
+    result = "".join(stream_from_tgi(r.iter_lines()))
+
     return kai.GenerationOutput(results=[kai.GenerationResult(text=result)])
 
 @api.get("/info/version")

@@ -17,6 +17,5 @@ Environment Variables:
 
 ## Known Issues
 
-- some options of KAI are not supported by TGI API
-- no EOS token ban
-- outputs get trimmed and can cause words to get lumped together (e.g. when doing story writing)
+- only supports `temperature`, `top_p`, `top_k` and `rep_pen` sampler settings
+- no (EOS) token ban
