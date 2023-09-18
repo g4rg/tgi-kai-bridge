@@ -15,7 +15,7 @@ Environment Variables:
 `TGI_MODE` - additional information to add to the model name  
 `TGI_MODEL` - model name override
 
-## Known Issues
+## Limitations
 
 - only supports `temperature`, `top_p`, `top_k` and `rep_pen` sampler settings
 - no (EOS) token ban
