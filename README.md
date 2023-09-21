@@ -1,7 +1,7 @@
 
 # tgi-kai-bridge
 
-Minimal API translation layer to make [text-generation-inference](https://github.com/huggingface/text-generation-inference) accessible to KoboldAI clients including [KoboldAI](https://github.com/KoboldAI/KoboldAI-Client), [SillyTavern](https://github.com/SillyTavern/SillyTavern) and [AI-Horde-Worker](https://github.com/Haidra-Org/AI-Horde-Worker)
+Minimal API translation layer to make [text-generation-inference](https://github.com/huggingface/text-generation-inference) accessible to KoboldAI clients including [KoboldAI](https://github.com/KoboldAI/KoboldAI-Client), [TavernAI](https://github.com/TavernAI/TavernAI), [SillyTavern](https://github.com/SillyTavern/SillyTavern) and [AI-Horde-Worker](https://github.com/Haidra-Org/AI-Horde-Worker)
 
 Dockerfile (not tested) includes TGI and connects it to the [AI Horde](https://aihorde.net/)
 
