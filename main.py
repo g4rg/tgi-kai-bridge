@@ -28,15 +28,15 @@ def translate_payload(kai_payload: kai.GenerationInput) -> tgi.GenerateRequest:
                             truncate=max(1, kai_payload.max_context_length - kai_payload.max_length), \
                             max_new_tokens=kai_payload.max_length)
 
-    if kai_payload.temperature:
+    if kai_payload.temperature is not None:
         tgi_parameters.temperature = max(kai_payload.temperature, 0.001)
-    if kai_payload.top_p:
+    if kai_payload.top_p is not None:
         tgi_parameters.top_p = min(max(kai_payload.top_p, 0.001), 0.999)
-    if kai_payload.top_k:
-        tgi_parameters.top_k = max(kai_payload.top_k, 0.001)
-    if kai_payload.rep_pen:
+    if kai_payload.top_k is not None:
+        tgi_parameters.top_k = max(kai_payload.top_k, 1)
+    if kai_payload.rep_pen is not None:
         tgi_parameters.repetition_penalty = max(kai_payload.rep_pen, 0.001)
-    if kai_payload.sampler_seed:
+    if kai_payload.sampler_seed is not None:
         tgi_parameters.seed = kai_payload.sampler_seed
 
     return tgi.GenerateRequest(inputs=kai_payload.prompt, parameters=tgi_parameters)
