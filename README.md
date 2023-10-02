@@ -10,12 +10,29 @@ Dockerfile (not tested) includes TGI and connects it to the [AI Horde](https://a
 Environment Variables:
 
 `KAI_PORT` - port to listen on for KAI clients (default `5000`)  
-`KAI_HOST` - hostname to listen on (default `127.0.0.1`)  
-`TGI_ENDPOINT` - URL to TGI REST API (default `http://127.0.0.1:3000`)  
+`KAI_HOST` - hostname to listen on (default `127.0.0.1`)
+
+Command-line args:
+`--type` - backend to use. options are "vllm" or "tgi" (though it only looks for vllm and otherwise assumes tgi)
+
+### text-generation-inference backend
+
+Command-line args:
+`--endpoint` - URL to TGI REST API
+
+Environment variables: (sorry, I know this is a weird wart)
 `TGI_MODE` - additional information to add to the model name  
 `TGI_MODEL` - model name override
+
+### vLLM backend
+
+Command-line args:
+`--model` - HuggingFace repo pointer, or a path to a local copy of the safetensors for a model.
+
+There are many other arguments introduced by the vLLM codebase itself; pass --help to see them all.
 
 ## Limitations
 
 - only supports `temperature`, `top_p`, `top_k` and `rep_pen` sampler settings
 - no (EOS) token ban
+
