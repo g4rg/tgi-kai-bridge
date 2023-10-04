@@ -107,7 +107,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--type", type=str, default="tgi")
     parser.add_argument("--endpoint", type=str, default="http://localhost:3000")
-    parser.add_argument("--mode", type=str, default="", help="information to add to"
+    parser.add_argument("--mode", type=str, default=None, help="information to add to"
                                                              " the model string that describes"
                                                              " the model in use, such as whether"
                                                              " it is quantized to a lower"
@@ -124,7 +124,7 @@ if __name__ == "__main__":
     if args.type == "vllm":
         engine_args = AsyncEngineArgs.from_cli_args(args)
         engine = AsyncLLMEngine.from_engine_args(engine_args)
-        INFERENCE_ENGINE = VLLMInferenceEngine(engine)
+        INFERENCE_ENGINE = VLLMInferenceEngine(engine, mode=args.mode, model=args.model)
     else:
         INFERENCE_ENGINE = TextGenerationInferenceEngine(args.endpoint, TGI_MODEL, TGI_MODE)
 

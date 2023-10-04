@@ -139,7 +139,13 @@ class VLLMInferenceEngine(InferenceEngine):
                 yield string
 
     def get_model(self) -> str:
-        pass
+        model = self.model
+        model_name = "vllm" \
+                     + (f"-{self.mode}" if self.mode else "") \
+                     + "/" + model
+
+        return model_name
+
 
     @staticmethod
     def sampling_params(kai_payload: kai.GenerationInput) -> SamplingParams:
