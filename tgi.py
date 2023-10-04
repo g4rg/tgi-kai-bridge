@@ -7,6 +7,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field, PositiveFloat, PositiveInt, confloat, conint, ConfigDict
 
+
 class ErrorResponse(BaseModel):
     error: str
     error_type: str

@@ -1,143 +1,84 @@
 #!/bin/env python3
-
-import os
+import argparse
 import json
+import os
+from typing import AsyncGenerator
 
-from typing import Iterator
-
-from fastapi import FastAPI, APIRouter
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import FastAPI, APIRouter, Request
 from fastapi.encoders import jsonable_encoder
-
-import requests
+from fastapi.responses import JSONResponse, StreamingResponse
+from vllm.engine.arg_utils import EngineArgs, AsyncEngineArgs
+from vllm.engine.async_llm_engine import AsyncLLMEngine
 
 import kai
-import tgi
+from drivers import InferenceEngine, DummyInferenceEngine, VLLMInferenceEngine, \
+    TextGenerationInferenceEngine
+from util import BridgeException
 
 app = FastAPI(title="tgi-kai-bridge")
 api = APIRouter()
 
+INFERENCE_ENGINE_STR = os.environ.get("KAI_BRIDGE_ENGINE", "tgi")
 TGI_ENDPOINT = os.environ.get("TGI_ENDPOINT", "http://127.0.0.1:3000")
 TGI_MODE = os.environ.get("TGI_MODE", "")
 TGI_MODEL = os.environ.get("TGI_MODEL", "")
 
-def translate_payload(kai_payload: kai.GenerationInput) -> tgi.GenerateRequest:
-    """ Translate KoboldAI GenerationInput to TGI GenerateRequest """
+INFERENCE_ENGINE: InferenceEngine = DummyInferenceEngine()
 
-    tgi_parameters = tgi.GenerateParameters.model_construct(do_sample=True, \
-                            truncate=max(1, kai_payload.max_context_length - kai_payload.max_length), \
-                            max_new_tokens=kai_payload.max_length)
-
-    if kai_payload.temperature is not None:
-        tgi_parameters.temperature = max(kai_payload.temperature, 0.001)
-    if kai_payload.top_p is not None and kai_payload.top_p != 1:
-        tgi_parameters.top_p = min(max(kai_payload.top_p, 0.001), 0.999)
-    if kai_payload.top_k is not None and kai_payload.top_k != 0:
-        tgi_parameters.top_k = max(kai_payload.top_k, 1)
-    if kai_payload.rep_pen is not None and kai_payload.rep_pen != 1:
-        tgi_parameters.repetition_penalty = max(kai_payload.rep_pen, 0.001)
-    if kai_payload.sampler_seed is not None:
-        tgi_parameters.seed = kai_payload.sampler_seed
-
-    return tgi.GenerateRequest(inputs=kai_payload.prompt, parameters=tgi_parameters)
-
-@api.post("/generate")
-def generate(kai_payload: kai.GenerationInput) -> kai.GenerationOutput:
-    """ Generate text """
-
-    tgi_payload = translate_payload(kai_payload)
-
-    # use streaming to avoid spacing issues
-    # https://github.com/huggingface/text-generation-inference/pull/1024
-    r = requests.post(TGI_ENDPOINT + "/generate_stream", json=tgi_payload.model_dump(exclude_none=True), headers={"Content-Type": "application/json"})
-
-    if r.status_code != 200:
-        raise BridgeException(kai.BasicError(msg=r.text, type="Error"))
-
-    result = "".join(stream_from_tgi(r.iter_lines()))
-
-    return kai.GenerationOutput(results=[kai.GenerationResult(text=result)])
 
 @api.get("/info/version")
 def get_version() -> kai.BasicResultInner:
     """ Impersonate KAI """
     return kai.BasicResultInner(result="1.2.4")
 
+
 @api.get("/model")
 def get_model() -> kai.BasicResultInner:
     """ Get current model """
-    model = TGI_MODEL or tgi.Info(**requests.get(TGI_ENDPOINT + "/info").json()).model_id
-    model_name = "tgi" \
-        + (f"-{TGI_MODE}" if TGI_MODE else "") \
-        + "/" + model
-    return kai.BasicResultInner(result=model_name)
+    return kai.BasicResultInner(result=INFERENCE_ENGINE.get_model())
+
 
 @api.get("/config/soft_prompts_list")
 def get_available_softprompts() -> kai.SoftPromptsList:
     """ stub for AI-Horde-Worker compatibility """
     return kai.SoftPromptsList(values=[])
 
+
 @api.get("/config/soft_prompt")
 def get_current_softprompt() -> kai.SoftPromptSetting:
     """ stub for AI-Horde-Worker compatibility """
     return kai.SoftPromptSetting(value="")
+
 
 @api.put("/config/soft_prompt")
 def set_current_softprompt():
     """ stub for AI-Horde-Worker compatibility """
     return kai.Empty()
 
-class BridgeException(Exception):
-    def __init__(self, model: kai.BasicError):
-        self.model = model
 
-def stream_from_tgi(iter_sse_lines: Iterator[bytes]) -> Iterator[str]:
-    """ Produce tokens streamed from TGI SSE byte stream """
+@api.post("/generate")
+async def generate(kai_payload: kai.GenerationInput) -> kai.GenerationOutput:
+    """ Generate text """
+    return await INFERENCE_ENGINE.generate(kai_payload)
 
-    generated_text = ""
-    for line in iter_sse_lines:
-        data = str(line, "utf-8")
-
-        if not data.startswith("data:"):
-            continue
-
-        json_data = json.loads(data.lstrip("data:"))
-        if json_data["generated_text"] is not None and len(json_data["generated_text"]) > 0:
-            generated_text = json_data["generated_text"]
-
-        if json_data["token"]["special"]:
-            continue
-
-        yield json_data["token"]["text"]
-
-    return generated_text
-
-def stream_kobold(iter_tokens: Iterator[str]) -> Iterator[bytes]:
-    """ Produce Kobold SSE byte stream from strings """
-
-    generated_text = ""
-    for token in iter_tokens:
-        yield b"event: message\n"
-        yield f"data: {json.dumps({'token': token})}\n\n".encode()
-        generated_text += token
-
-    return generated_text
 
 @app.post("/api/extra/generate/stream")
-def generate_stream(kai_payload: kai.GenerationInput) -> StreamingResponse:
+async def generate_stream(request: Request) -> StreamingResponse:
     """ KoboldCpp streaming """
+    json_payload = await request.json()
+    kai_payload = kai.GenerationInput.model_construct(**json_payload)
 
-    r = requests.post(TGI_ENDPOINT + "/generate_stream", \
-                      json=translate_payload(kai_payload).model_dump(exclude_none=True), \
-                      headers={"Content-Type": "application/json"}, \
-                      stream=True)
+    result = INFERENCE_ENGINE.generate_stream(kai_payload)
 
-    if r.status_code != 200:
-        raise BridgeException(kai.BasicError(msg=r.text, type="Error"))
+    async def stream_results() -> AsyncGenerator[bytes, None]:
+        async for token in result:
+            yield b"event: message\n"
+            yield f"data: {json.dumps({'token': token})}\n\n".encode()
 
-    return StreamingResponse(stream_kobold(stream_from_tgi(r.iter_lines())), \
-                             headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}, \
+    return StreamingResponse(stream_results(),
+                             headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
                              media_type='text/event-stream')
+
 
 @app.post("/api/extra/abort")
 def abort_generation():
@@ -148,20 +89,44 @@ def abort_generation():
 app.include_router(api, prefix="/api/v1")
 app.include_router(api, prefix="/api/latest", include_in_schema=False)
 
+
 @app.exception_handler(BridgeException)
 def exception_handler(_, exc: BridgeException):
     return JSONResponse(status_code=400, content=jsonable_encoder(exc.model))
+
 
 @app.get("/api/extra/version")
 def get_extra_version():
     """ Impersonate KoboldCpp with streaming support """
     return {"result": "KoboldCpp", "version": "1.30"}
 
+
 if __name__ == "__main__":
     import uvicorn
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--type", type=str, default="tgi")
+    parser.add_argument("--endpoint", type=str, default="http://localhost:3000")
+    parser.add_argument("--mode", type=str, default=None, help="information to add to"
+                                                             " the model string that describes"
+                                                             " the model in use, such as whether"
+                                                             " it is quantized to a lower"
+                                                             " precision")
+
+    parser = AsyncEngineArgs.add_cli_args(parser)
+    args = parser.parse_args()
+
+    # the host/port that this server will bind to, not the tgi api server. that's
+    # --endpoint in the parser.
     host = os.environ.get("KAI_HOST", "127.0.0.1")
     port = int(os.environ.get("KAI_PORT", 5000))
+
+    if args.type == "vllm":
+        engine_args = AsyncEngineArgs.from_cli_args(args)
+        engine = AsyncLLMEngine.from_engine_args(engine_args)
+        INFERENCE_ENGINE = VLLMInferenceEngine(engine, mode=args.mode, model=args.model)
+    else:
+        INFERENCE_ENGINE = TextGenerationInferenceEngine(args.endpoint, TGI_MODEL, TGI_MODE)
 
     if os.environ.get("DEBUG"):
         uvicorn.run("main:app", reload=True, host=host, port=port, log_level="debug")
