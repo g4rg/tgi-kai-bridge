@@ -5,6 +5,17 @@ Minimal API translation layer to make [text-generation-inference](https://github
 
 Dockerfile (not tested) includes TGI and connects it to the [AI Horde](https://aihorde.net/)
 
+## Installation
+
+1. make a virtualenv and activate it
+2. pip install -r requirements.txt
+3. pip install -U pydantic
+
+Example vLLM usage:
+```
+python main.py --type vllm --model TheBloke/MythoMax-L2-13B-AWQ -q awq
+```
+
 ## Configuration
 
 Environment Variables:
